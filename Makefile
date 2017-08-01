@@ -4,7 +4,7 @@
 #sudo modprobe snd_seq
 CC=g++
 
-CFLAGS=-c -O3 -mfloat-abi=softfp -Wall -I./src -I./rtmidi-1.0.15/ -I./rtaudio-4.0.10/ -D__LINUX_ALSASEQ__ -DHAVE_GETTIMEOFDAY -D__LINUX_ALSA__
+CFLAGS=-c -O3 -Wall -I./src -I./rtmidi-1.0.15/ -I./rtaudio-4.0.10/ -D__LINUX_ALSASEQ__ -DHAVE_GETTIMEOFDAY -D__LINUX_ALSA__
 LDFLAGS= -DHAVE_GETTIMEOFDAY -D__LINUX_ALSA__ -lpthread -lasound
 SOURCES=$(wildcard src/*.cpp)
 OBJECTS=$(SOURCES:.cpp=.o)
