@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "RtAudio.h"
 #include "RtMidi.h"
@@ -159,7 +160,7 @@ void midiCallback( double deltatime, std::vector< unsigned char > *message, void
     		mute = true;
     	}
     } else if(message->at(0)==176) {
-    	int val = message->at(2);
+		int val = message->at(2);
 		switch(message->at(1)) {
 			case 1:
 				oscFreq.set(logMap(val, 0, 127, 20, 8000));
@@ -212,11 +213,12 @@ void midiCallback( double deltatime, std::vector< unsigned char > *message, void
 
 
 int startMidi();
-int startAudio();
+int startAudio(int);
 
 
-int main() {
+int main(int argc, char *argv[]) {
 	printf("Noisebox!\n");
+	int outputDevice = atoi(argv[1]);
 	
 
 	osc.setOscType(kOSC_TYPE_SAW , SAMPLERATE);
@@ -234,7 +236,7 @@ int main() {
 		return 1;
 	}
 	
-	if(startAudio()!=0) {
+	if(startAudio(outputDevice)!=0) {
 		return 1;
 	}
 
@@ -255,34 +257,10 @@ int main() {
 
 
 
-int startAudio() {
+int startAudio(int outputDevice) {
 
-	// Determine the number of devices available
-	unsigned int devices = audio.getDeviceCount();
-
-	
-	if(devices==0) {
-		printf("please run 'sudo modprobe snd_bcm2835' to enable the alsa driver\n");
-		return 1;
-	}
-	// Scan through devices for various capabilities
-	RtAudio::DeviceInfo info;
-	for ( unsigned int i=0; i<devices; i++ ) {
-
-		info = audio.getDeviceInfo( i );
-
-		if ( info.probed == true ) {
-			// Print, for example, the maximum number of output channels for each device
-			std::cout << "device = " << i;
-			std::cout << ": maximum output channels = " << info.outputChannels << "\n";
-		}
-	}
-	
-	
-
-	
 	RtAudio::StreamParameters parameters;
-	parameters.deviceId = audio.getDefaultOutputDevice();
+	parameters.deviceId = outputDevice;
 	parameters.nChannels = 2;
 	parameters.firstChannel = 0;
 	unsigned int sampleRate = SAMPLERATE;
