@@ -18,13 +18,10 @@
 #define MOD_PITCH 1
 #define MOD_CUTOFF 2
 
-
-
 using namespace std;
 
 /////////////////////////////////
 // HANDY UTILS
-
 
 float map(float in, float inMin, float inMax, float outMin, float outMax) {
 	return outMin + (outMax - outMin)*(in - inMin)/(inMax-inMin);
@@ -36,30 +33,17 @@ float logMap(float in, float inMin, float inMax, float outMin, float outMax) {
 	return outMin + (outMax - outMin)*norm;
 }
 
-
-
 RtAudio audio;
-RtMidiIn  *midiin = 0;
-
-
-
-
+RtMidiIn *midiin = 0;
 
 SinLUT sinLut;
-
-
-
-
-
 
 Oscillator lfo;
 Oscillator osc;
 Filter filter;
 
-
 /////////////////////////////////
 // PARAMETERS CONTROLLED BY MIDI
-
 
 Parameter modAmount(0.5);
 Parameter oscFreq(440);
@@ -68,15 +52,12 @@ Parameter lfoFreq(0.1);
 Parameter filterFreq(3000);
 Parameter filterRes(1);
 
-
 int modType = MOD_PITCH;
 
 float distGain = 1;
 float distVolume = 1;
 
 bool mute = false;
-
-
 
 /////////////////////////////
 // NICE DISTORTION
@@ -87,53 +68,48 @@ float distort(float inp) {
 	else return d;
 }
 
-
 //////////////////////////////////////////
 // the magic
-int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int length,
-         double streamTime, RtAudioStreamStatus status, void *userData )
+int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int length, double streamTime, RtAudioStreamStatus status, void *userData )
 {
-
 	float *buffer = (float *) outputBuffer;
 
 	if ( status )
 		std::cout << "Stream underflow detected!" << std::endl;
 	float out = 0;
 	for(int i = 0; i < length; i++) {
-	
+
 		float of = oscFreq.get();
 		lfo.frequency = lfoFreq.get();
-		
-		
+
 		if(modType==MOD_PITCH) {
 			osc.frequency = of - modAmount.get()*map(lfo.getSample(), -1, 1, 0, of);
 		} else {
 			osc.frequency = of;
 		}
-		
-		
+
 		float filtFreq = filterFreq.get();
-		
+
 		if(modType==MOD_CUTOFF) {
 			filtFreq = filtFreq - modAmount.get()*map(lfo.getSample(), -1, 1, 40, filtFreq);
 		}
-		
+
 		float s = osc.getSample();
-		
+
 		out = filter.lores(s, filtFreq, filterRes.get());
 		out = distort(out*distVolume);
-		
+
 		if(out!=out) { // NaN prevention
 			out = s;
 		}
 		out *= 0.7f;
-		
+
 		if(mute) out = 0;
 		buffer[i*2] = out;
 		buffer[i*2+1] = out;
 	}
-	
-  return 0;
+
+	return 0;
 }
 
 //////////////////////////////////////////
@@ -141,25 +117,24 @@ int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int length,
 void midiCallback( double deltatime, std::vector< unsigned char > *message, void *userData )
 {
 
-  unsigned int nBytes = message->size();
-  for ( unsigned int i=0; i<nBytes; i++ )
-    std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
-  if ( nBytes > 0 )
-    std::cout << "stamp = " << deltatime << std::endl;
+	unsigned int nBytes = message->size();
+	for ( unsigned int i=0; i<nBytes; i++ )
+		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
+	if ( nBytes > 0 )
+		std::cout << "stamp = " << deltatime << std::endl;
 
-
-    if(message->at(0)==144) {
-    	// note on
-    	mute = false;
-    	int oscType = message->at(1) - 36;
-    	oscType %= 4;
-    	osc.setOscType(oscType, SAMPLERATE);
-    } else if(message->at(0)==128) {
-    	// note off
-    	if(message->at(1)<=39) {
-    		mute = true;
-    	}
-    } else if(message->at(0)==176) {
+	if(message->at(0)==144) {
+		// note on
+		mute = false;
+		int oscType = message->at(1) - 36;
+		oscType %= 4;
+		osc.setOscType(oscType, SAMPLERATE);
+	} else if(message->at(0)==128) {
+		// note off
+		if(message->at(1)<=39) {
+			mute = true;
+		}
+	} else if(message->at(0)==176) {
 		int val = message->at(2);
 		switch(message->at(1)) {
 			case 1:
@@ -170,81 +145,54 @@ void midiCallback( double deltatime, std::vector< unsigned char > *message, void
 				break;
 			case 3:
 				modAmount.set(map(val, 0, 127, 0, 1));
-			 	break;
-			 case 4:
+				break;
+			case 4:
 				if(val>63) {
 					modType = MOD_PITCH;
 				} else {
 					modType = MOD_CUTOFF;
 				}
-			 	break;
-			 	
-			 case 5:
+				break;
+			case 5:
 				filterFreq.set(map(val, 0, 127, 50, 4000));
-			 	break;
-			 case 6:
-			 	filterRes.set(map(val, 0, 127, 1, 10));
+				break;
+			case 6:
+				filterRes.set(map(val, 0, 127, 1, 10));
 				break;
 			case 7:
 				distVolume = logMap(val, 0, 127, 0, 10);
-			 	break;
-			 case 8:
-			 	distGain = logMap(val, 0, 127, 0, 10);
+				break;
+			case 8:
+				distGain = logMap(val, 0, 127, 0, 10);
 				break;
 		}
 	}
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 int startMidi();
 int startAudio(int);
-
 
 int main(int argc, char *argv[]) {
 	printf("Noisebox!\n");
 	int outputDevice = atoi(argv[1]);
-	
 
 	osc.setOscType(kOSC_TYPE_SAW , SAMPLERATE);
 	osc.frequency = 440;
-	
+
 	lfo.setOscType(kOSC_TYPE_SAW, SAMPLERATE);
 	lfo.frequency = 0.1;
-	
-
-
-
 
 	if(startMidi()!=0) {
-		
 		return 1;
 	}
-	
+
 	if(startAudio(outputDevice)!=0) {
 		return 1;
 	}
 
-	
-
 	cout << "\nPlaying ... press any to quit.\n";
 	while ( cin.peek() == EOF ) {
-         usleep(100*1000);
+		usleep(100*1000);
 	}
 
 	printf("Bye!\n");
@@ -252,10 +200,6 @@ int main(int argc, char *argv[]) {
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // ALL BORING AUDIO AND MIDI SETUP STUFF BELOW HERE
-
-
-
-
 
 int startAudio(int outputDevice) {
 
@@ -268,17 +212,15 @@ int startAudio(int outputDevice) {
 	double data[2];
 
 	try {
-		audio.openStream( &parameters, NULL, RTAUDIO_FLOAT32,
-                    sampleRate, &bufferFrames, &audioCallback, (void *)&data );
+		audio.openStream( &parameters, NULL, RTAUDIO_FLOAT32, sampleRate, &bufferFrames, &audioCallback, (void *)&data );
 		audio.startStream();
 	} catch ( RtError& e ) {
 		e.printMessage();
 		return 1;
 	}
-	
+
 	return 0;
 }
-
 
 int startMidi() {
 	try {
@@ -293,12 +235,12 @@ int startMidi() {
 			cout << "Try running 'sudo modprobe snd_seq' if you're getting permission errors\n";
 			return 1;
 		}
-		
+
 		for ( unsigned i=0; i<nPorts; i++ ) {
 			std::string portName = midiin->getPortName(i);
-			std::cout << "  Input Port #" << i+1 << ": " << portName << '\n';
+			std::cout << "	Input Port #" << i+1 << ": " << portName << '\n';
 		}
-		
+
 		// open the last port (they're 0-indexed)
 		midiin->openPort( nPorts -1);
 		midiin->setCallback( &midiCallback );
@@ -311,5 +253,3 @@ int startMidi() {
 	}
 	return 0;
 }
-
-
