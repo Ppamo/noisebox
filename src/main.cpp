@@ -9,6 +9,7 @@
 
 #define SAMPLERATE 22050
 #define BUFFERSIZE 128
+#define MIDIDEVICE "LPD8"
 
 #include "Oscillator.h"
 #include "Filter.h"
@@ -117,24 +118,22 @@ int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int length, d
 void midiCallback( double deltatime, std::vector< unsigned char > *message, void *userData )
 {
 
-	unsigned int nBytes = message->size();
-	for ( unsigned int i=0; i<nBytes; i++ )
-		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
-	if ( nBytes > 0 )
-		std::cout << "stamp = " << deltatime << std::endl;
-
 	if(message->at(0)==144) {
 		// note on
 		mute = false;
 		int oscType = message->at(1) - 36;
 		oscType %= 4;
 		osc.setOscType(oscType, SAMPLERATE);
-	} else if(message->at(0)==128) {
+		return;
+	}
+	if(message->at(0)==128) {
 		// note off
 		if(message->at(1)<=39) {
 			mute = true;
 		}
-	} else if(message->at(0)==176) {
+		return;
+	}
+	if(message->at(0)==176) {
 		int val = message->at(2);
 		switch(message->at(1)) {
 			case 1:
@@ -166,6 +165,7 @@ void midiCallback( double deltatime, std::vector< unsigned char > *message, void
 				distGain = logMap(val, 0, 127, 0, 10);
 				break;
 		}
+		return;
 	}
 }
 
@@ -224,7 +224,6 @@ int startAudio(int outputDevice) {
 
 int startMidi() {
 	try {
-
 		// RtMidiIn constructor ... exception possible
 		midiin = new RtMidiIn();
 
@@ -236,17 +235,18 @@ int startMidi() {
 			return 1;
 		}
 
+		std::string deviceName (MIDIDEVICE);
 		for ( unsigned i=0; i<nPorts; i++ ) {
+			// open the first MIDIDEVICE
 			std::string portName = midiin->getPortName(i);
-			std::cout << "	Input Port #" << i+1 << ": " << portName << '\n';
+			if (portName.compare(0, deviceName.length(), deviceName) == 0){
+				std::cout << "Openning Port #" << i+1 << ": " << portName << '\n';
+				midiin->openPort(i);
+				midiin->setCallback(&midiCallback);
+				midiin->ignoreTypes( true, true, true );
+				break;
+			}
 		}
-
-		// open the last port (they're 0-indexed)
-		midiin->openPort( nPorts -1);
-		midiin->setCallback( &midiCallback );
-		// ignore sysex, timing, and active sensing messages.
-		midiin->ignoreTypes( true, true, true );
-
 	} catch ( RtError &error ) {
 		error.printMessage();
 		return 1;
