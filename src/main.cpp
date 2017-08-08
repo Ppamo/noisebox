@@ -58,7 +58,7 @@ int modType = MOD_PITCH;
 float distGain = 1;
 float distVolume = 1;
 
-bool mute = false;
+bool mute = true;
 
 /////////////////////////////
 // NICE DISTORTION
@@ -159,10 +159,10 @@ void midiCallback( double deltatime, std::vector< unsigned char > *message, void
 				filterRes.set(map(val, 0, 127, 1, 10));
 				break;
 			case 7:
-				distVolume = logMap(val, 0, 127, 0, 10);
+				distGain = logMap(val, 0, 127, 0, 10);
 				break;
 			case 8:
-				distGain = logMap(val, 0, 127, 0, 10);
+				distVolume = logMap(val, 0, 127, 0, 10);
 				break;
 		}
 		return;
@@ -174,7 +174,9 @@ int startAudio(int);
 
 int main(int argc, char *argv[]) {
 	printf("Noisebox!\n");
-	int outputDevice = atoi(argv[1]);
+	int outputDevice = 0;
+	if (argc == 2)
+		outputDevice = atoi(argv[1]);
 
 	osc.setOscType(kOSC_TYPE_SAW , SAMPLERATE);
 	osc.frequency = 440;
