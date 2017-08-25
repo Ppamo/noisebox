@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "RtAudio.h"
 #include "RtMidi.h"
@@ -175,7 +176,7 @@ int startAudio(int);
 int main(int argc, char *argv[]) {
 	printf("Noisebox!\n");
 	int outputDevice = 0;
-	if (argc == 2)
+	if (argc > 1)
 		outputDevice = atoi(argv[1]);
 
 	osc.setOscType(kOSC_TYPE_SAW , SAMPLERATE);
@@ -190,6 +191,14 @@ int main(int argc, char *argv[]) {
 
 	if(startAudio(outputDevice)!=0) {
 		return 1;
+	}
+
+	// report status to parent process
+	std::string slave = "slave";
+	if (argc > 2) {
+		if (!slave.compare(argv[2])) {
+			kill(getppid(), SIGUSR1);
+		}
 	}
 
 	cout << "\nPlaying ... press any to quit.\n";
